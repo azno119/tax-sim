@@ -95,63 +95,15 @@ export default function TaxSimulator() {
     return { ei, sd, si, spouseD, depD, basicB, basicA, basicR, tiB, itB, stB, rtB, totalB, rei, totalRI, totalExp, tiA, itA, stA, rtA, totalA, savings: totalB - totalA };
   }, [salary, hasSpouse, deps, siMode, siManual, properties])();
 
-  const downloadHTML = () => {
-    const rows2 = rows.map(([label, before, after, diff]) => `
-      <tr>
-        <td>${label}</td>
-        <td>${before === null ? "—" : fmt(before) + "円"}</td>
-        <td>${fmt(after)}円</td>
-        <td style="color:${diff < 0 ? "#2a7a4f" : diff > 0 ? "#c0392b" : "#666"};font-weight:${diff !== 0 ? 600 : 400}">
-          ${diff === 0 ? "—" : diff < 0 ? `▼${fmt(Math.abs(diff))}円` : `▲${fmt(Math.abs(diff))}円`}
-        </td>
-      </tr>`).join("");
-
-    const html = `<!DOCTYPE html>
-<html lang="ja"><head><meta charset="UTF-8"><title>税負担シミュレーション</title>
-<style>
-  *{box-sizing:border-box;margin:0;padding:0}
-  body{font-family:'Noto Sans JP',sans-serif;background:#f4f6fb;color:#1a1a2e;font-size:14px;padding:24px}
-  .header{background:#1a2a4a;color:#fff;border-radius:12px;padding:20px 28px;margin-bottom:20px;display:flex;justify-content:space-between;align-items:center}
-  h1{font-size:18px;font-weight:500}.sub{font-size:12px;opacity:.7;margin-top:2px}
-  .btn{background:#c9a84c;color:#1a2a4a;border:none;padding:8px 20px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer}
-  .hero{background:#1a2a4a;border-radius:12px;padding:24px;text-align:center;margin-bottom:20px;-webkit-print-color-adjust:exact;print-color-adjust:exact}
-  .hero-label{color:rgba(255,255,255,.65);font-size:12px;margin-bottom:6px}
-  .hero-amount{color:#c9a84c;font-size:38px;font-weight:600}
-  .hero-sub{color:rgba(255,255,255,.5);font-size:11px;margin-top:6px}
-  table{width:100%;border-collapse:collapse;font-size:13px;margin-bottom:20px}
-  th{background:#f4f6fb;padding:10px 12px;text-align:left;font-size:11px;color:#6b7a99;font-weight:600}
-  th:not(:first-child){text-align:right}
-  td{padding:9px 12px;border-bottom:1px solid #f0f2f7}
-  td:not(:first-child){text-align:right}
-  .note{font-size:11px;color:#aab;line-height:1.6;padding-top:12px;border-top:1px solid #e8ecf2}
-  @media print{.btn{display:none}}
-</style></head><body>
-<div class="header">
-  <div><h1>税負担シミュレーション</h1><p class="sub">不動産投資による節税効果 試算レポート</p></div>
-  <button class="btn" onclick="window.print()">🖨️ 印刷 / PDF出力</button>
-</div>
-<div class="hero">
-  <div class="hero-label">年間節税効果（概算）</div>
-  <div class="hero-amount">${result.savings >= 0 ? `▼ ${wan(result.savings)}` : `▲ ${wan(Math.abs(result.savings))}`}</div>
-  <div class="hero-sub">所得税 ${result.itB+result.stB-(result.itA+result.stA) >= 0 ? "▼" : "▲"}${wan(Math.abs(result.itB+result.stB-result.itA-result.stA))} ／ 住民税 ${result.rtB-result.rtA >= 0 ? "▼" : "▲"}${wan(Math.abs(result.rtB-result.rtA))}</div>
-</div>
-<table>
-  <thead><tr><th>項目</th><th>給与のみ</th><th>確定申告後</th><th>差額</th></tr></thead>
-  <tbody>${rows2}
-    <tr style="font-weight:600;font-size:14px;border-top:2px solid #dde2ed">
-      <td>税負担合計</td><td style="text-align:right">${fmt(result.totalB)}円</td><td style="text-align:right">${fmt(result.totalA)}円</td>
-      <td style="text-align:right;color:${result.savings>0?"#2a7a4f":result.savings<0?"#c0392b":"inherit"}">${result.savings===0?"—":result.savings>0?`▼${fmt(result.savings)}円`:`▲${fmt(Math.abs(result.savings))}円`}</td>
-    </tr>
-  </tbody>
-</table>
-<div class="note">※本シミュレーションは概算です。詳細は税理士にご相談ください。</div>
-</body></html>`;
-
-    const blob = new Blob([html], { type: "text/html;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url; a.download = "税負担シミュレーション.html"; a.click();
-    URL.revokeObjectURL(url);
+  const downloadPDF = async () => {
+    const el = document.getElementById("report-panel");
+    const canvas = await html2canvas(el, { scale: 2, useCORS: true });
+    const img = canvas.toDataURL("image/png");
+    const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+    const w = pdf.internal.pageSize.getWidth();
+    const h = (canvas.height * w) / canvas.width;
+    pdf.addImage(img, "PNG", 0, 0, w, h);
+    pdf.save("税負担シミュレーション.pdf");
   };
 
   const rows = [
@@ -183,8 +135,8 @@ export default function TaxSimulator() {
             <div style={{ fontSize: 18, fontWeight: 500 }}>税負担シミュレーション</div>
             <div style={{ fontSize: 12, opacity: .7, marginTop: 2 }}>不動産投資による節税効果 試算レポート</div>
           </div>
-          <button onClick={downloadHTML} style={{ background: "#c9a84c", color: "#1a2a4a", border: "none", padding: "8px 20px", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
-            📥 レポートをDL
+          <button onClick={downloadPDF} style={{ background: "#c9a84c", color: "#1a2a4a", border: "none", padding: "8px 20px", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+            📥 PDFをDL
           </button>
         </div>
 
@@ -245,7 +197,7 @@ export default function TaxSimulator() {
             <button onClick={addProp} style={{ width: "100%", padding: 8, border: "1px dashed #c0c8da", borderRadius: 8, background: "none", color: "#6b7a99", cursor: "pointer", fontSize: 13 }}>＋ 物件を追加する</button>
           </div>
 
-          <div style={{ background: "#fff", border: "1px solid #e8ecf2", borderRadius: 12, padding: 20 }}>
+          <div id="report-panel" style={{ background: "#fff", border: "1px solid #e8ecf2", borderRadius: 12, padding: 20 }}>
             <div style={{ background: "#1a2a4a", borderRadius: 12, padding: 24, textAlign: "center", marginBottom: 16 }}>
               <div style={{ color: "rgba(255,255,255,.65)", fontSize: 12, marginBottom: 6 }}>年間節税効果（概算）</div>
               <div style={{ color: "#c9a84c", fontSize: 38, fontWeight: 600 }}>
