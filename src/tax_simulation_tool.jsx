@@ -1,7 +1,7 @@
-import jsPDF from "jspdf";
-import html2canvas from "html2canvas";
 import { useState, useCallback } from "react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from "recharts";
+import jsPDF from "jspdf";
+import html2canvas from "html2canvas";
 
 function calcSalaryDeduction(s) {
   if (s <= 1900000) return 650000;
@@ -18,7 +18,8 @@ function calcBasicDeduction(n) {
   if (n <= 6550000)  return 630000;
   if (n <= 23500000) return 580000;
   if (n <= 24000000) return 480000;
-  if (n <= 24500000) return 160000;
+  if (n <= 24500000) return 320000;
+  if (n <= 25000000) return 160000;
   return 0;
 }
 
@@ -53,6 +54,8 @@ export default function TaxSimulator() {
   const [deps, setDeps] = useState(1);
   const [siMode, setSiMode] = useState("auto");
   const [siManual, setSiManual] = useState(900000);
+  const [reiMode, setReiMode] = useState("auto");
+  const [reiManual, setReiManual] = useState(0);
   const [properties, setProperties] = useState([
     { id: 1, name: "物件A", rentalIncome: 1200000, mgmt: 120000, loan: 300000, fat: 80000, depr: 500000, other: 50000 },
   ]);
@@ -76,7 +79,7 @@ export default function TaxSimulator() {
       totalRI += p.rentalIncome;
       totalExp += p.mgmt + p.loan + p.fat + p.depr + p.other;
     });
-    const rei = totalRI - totalExp;
+    const rei = reiMode === "auto" ? totalRI - totalExp : reiManual;
     const totalI = ei + rei;
 
     const basicB = calcBasicDeduction(ei);
@@ -95,18 +98,19 @@ export default function TaxSimulator() {
     const totalA = itA + stA + rtA;
 
     return { ei, sd, si, spouseD, depD, basicB, basicA, basicR, tiB, itB, stB, rtB, totalB, rei, totalRI, totalExp, tiA, itA, stA, rtA, totalA, savings: totalB - totalA };
-  }, [salary, hasSpouse, deps, siMode, siManual, properties])();
+  }, [salary, hasSpouse, deps, siMode, siManual, reiMode, reiManual, properties])();
 
   const downloadPDF = async () => {
-  const el = document.getElementById("report-panel");
-  const canvas = await html2canvas(el, { scale: 2, useCORS: true });
-  const img = canvas.toDataURL("image/png");
-  const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
-  const w = pdf.internal.pageSize.getWidth();
-  const h = (canvas.height * w) / canvas.width;
-  pdf.addImage(img, "PNG", 0, 0, w, h);
-  pdf.save("税負担シミュレーション.pdf");
-};
+    const el = document.getElementById("report-panel");
+    const canvas = await html2canvas(el, { scale: 2, useCORS: true });
+    const img = canvas.toDataURL("image/png");
+    const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+    const w = pdf.internal.pageSize.getWidth();
+    const h = (canvas.height * w) / canvas.width;
+    pdf.addImage(img, "PNG", 0, 0, w, h);
+    pdf.save("税負担シミュレーション.pdf");
+  };
+
   const rows = [
     ["給与収入", salary, salary, 0],
     ["　└ 給与所得控除", result.sd, result.sd, 0],
@@ -141,8 +145,8 @@ export default function TaxSimulator() {
           </button>
         </div>
 
-        <div className="main-grid" style={{ display: "grid", gridTemplateColumns: "360px 1fr", gap: 16, alignItems: "start" }}>
-          <div className="left-panel" style={{ background: "#fff", border: "1px solid #e8ecf2", borderRadius: 12, padding: 20 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "360px 1fr", gap: 16, alignItems: "start" }}>
+          <div style={{ background: "#fff", border: "1px solid #e8ecf2", borderRadius: 12, padding: 20 }}>
             <div style={{ fontSize: 11, fontWeight: 600, color: "#6b7a99", textTransform: "uppercase", letterSpacing: ".08em", marginBottom: 12, paddingBottom: 8, borderBottom: "1px solid #e8ecf2" }}>給与情報</div>
             <div style={{ marginBottom: 12 }}>
               <label style={{ display: "block", fontSize: 12, color: "#6b7a99", marginBottom: 4 }}>給与収入（年収）</label>
@@ -178,7 +182,21 @@ export default function TaxSimulator() {
             </div>
 
             <div style={{ fontSize: 11, fontWeight: 600, color: "#6b7a99", textTransform: "uppercase", letterSpacing: ".08em", marginBottom: 12, paddingBottom: 8, borderBottom: "1px solid #e8ecf2", marginTop: 16 }}>不動産情報</div>
-            {properties.map(p => (
+            <div style={{ marginBottom: 12 }}>
+              <label style={{ display: "block", fontSize: 12, color: "#6b7a99", marginBottom: 4 }}>不動産所得</label>
+              <select value={reiMode} onChange={e => setReiMode(e.target.value)} style={F}>
+                <option value="auto">自動計算（物件入力から算出）</option>
+                <option value="manual">手動入力</option>
+              </select>
+            </div>
+            {reiMode === "manual" && (
+              <div style={{ marginBottom: 12 }}>
+                <label style={{ display: "block", fontSize: 12, color: "#6b7a99", marginBottom: 4 }}>不動産所得（年額）</label>
+                <input type="number" value={reiManual} onChange={e => setReiManual(Number(e.target.value))} style={F} />
+                <div style={{ fontSize: 11, color: "#6b7a99", marginTop: 4 }}>※マイナス入力で赤字による損益通算が可能</div>
+              </div>
+            )}
+            {reiMode === "auto" && properties.map(p => (
               <div key={p.id} style={{ border: "1px solid #e8ecf2", borderRadius: 8, padding: 14, marginBottom: 10 }}>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
                   <input value={p.name} onChange={e => updatePropName(p.id, e.target.value)} style={{ border: "none", background: "none", fontWeight: 600, fontSize: 13, color: "#1a1a2e", width: "100%" }} />
@@ -195,7 +213,9 @@ export default function TaxSimulator() {
                 </div>
               </div>
             ))}
-            <button onClick={addProp} style={{ width: "100%", padding: 8, border: "1px dashed #c0c8da", borderRadius: 8, background: "none", color: "#6b7a99", cursor: "pointer", fontSize: 13 }}>＋ 物件を追加する</button>
+            {reiMode === "auto" && (
+              <button onClick={addProp} style={{ width: "100%", padding: 8, border: "1px dashed #c0c8da", borderRadius: 8, background: "none", color: "#6b7a99", cursor: "pointer", fontSize: 13 }}>＋ 物件を追加する</button>
+            )}
           </div>
 
           <div id="report-panel" style={{ background: "#fff", border: "1px solid #e8ecf2", borderRadius: 12, padding: 20 }}>
