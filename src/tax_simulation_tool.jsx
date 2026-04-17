@@ -15,7 +15,7 @@ function calcBasicDeduction(n) {
   if (n <= 4890000)  return 680000;
   if (n <= 6550000)  return 630000;
   if (n <= 23500000) return 580000;
-  if (n <= 24000000) return 320000;
+  if (n <= 24000000) return 480000;
   if (n <= 24500000) return 160000;
   return 0;
 }
