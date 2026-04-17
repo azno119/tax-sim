@@ -65,17 +65,21 @@ export default function TaxSimulator() {
   const result = useCallback(() => {
     const sd = calcSalaryDeduction(salary);
     const ei = salary - sd;
-    const si = siMode === "auto" ? Math.floor(salary * 0.145) : siManual;
-    const basic = 480000, spouseD = hasSpouse ? 380000 : 0, depD = deps * 380000, basicR = 430000;
+    const spouseD = hasSpouse ? 380000 : 0, depD = deps * 380000, basicR = 430000;
+
+// 不動産所得を先に計算（基礎控除が合計所得依存のため）
+let totalRI = 0, totalExp = 0;
+properties.forEach(p => { totalRI += p.rentalIncome; totalExp += p.mgmt + p.loan + p.fat + p.depr + p.other; });
+const rei = totalRI - totalExp, totalI = ei + rei;
+
+// 2025改正: 基礎控除を合計所得ベースで計算
+const basicB = calcBasicDeduction(ei);
+const basicA = calcBasicDeduction(totalI);
 
     const tiB = Math.max(0, ei - si - basic - spouseD - depD);
     const itB = calcIncomeTax(tiB), stB = Math.floor(itB * 0.021);
     const rtB = calcResidentTax(Math.max(0, ei - si - basicR - spouseD - depD));
     const totalB = itB + stB + rtB;
-
-    let totalRI = 0, totalExp = 0;
-    properties.forEach(p => { totalRI += p.rentalIncome; totalExp += p.mgmt + p.loan + p.fat + p.depr + p.other; });
-    const rei = totalRI - totalExp, totalI = ei + rei;
 
     const tiA = Math.max(0, totalI - si - basic - spouseD - depD);
     const itA = calcIncomeTax(tiA), stA = Math.floor(itA * 0.021);
